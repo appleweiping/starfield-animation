@@ -41,14 +41,22 @@
       mix-blend-mode: screen;
     }
 
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at center, transparent 46%, rgba(0,0,0,0.12) 82%, rgba(0,0,0,0.24) 100%);
+    }
+
     .quote-wrap {
       position: fixed;
       left: 5.5vw;
       bottom: 8vh;
-      z-index: 10;
+      z-index: 20;
       pointer-events: none;
       user-select: none;
-      max-width: min(580px, 72vw);
+      max-width: min(620px, 74vw);
     }
 
     .quote {
@@ -62,7 +70,7 @@
         0 0 50px rgba(180,210,255,0.05);
       opacity: 0;
       transform: translateY(10px);
-      animation: quoteFade 2.8s ease forwards;
+      animation: quoteFade 2.8s ease forwards, quoteBreath 9s ease-in-out 2.8s infinite;
     }
 
     .signature {
@@ -77,6 +85,21 @@
       animation: quoteFade 3.3s ease forwards;
     }
 
+    .hint {
+      position: fixed;
+      right: 26px;
+      bottom: 22px;
+      z-index: 20;
+      color: rgba(215, 225, 255, 0.26);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      pointer-events: none;
+      user-select: none;
+      text-shadow: 0 0 14px rgba(190,210,255,0.05);
+      opacity: 0;
+      animation: hintFade 3.8s ease 1.6s forwards;
+    }
+
     @keyframes quoteFade {
       to {
         opacity: 1;
@@ -84,12 +107,21 @@
       }
     }
 
-    .vignette {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background:
-        radial-gradient(circle at center, transparent 48%, rgba(0,0,0,0.12) 82%, rgba(0,0,0,0.22) 100%);
+    @keyframes hintFade {
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes quoteBreath {
+      0%, 100% {
+        opacity: 0.86;
+        filter: brightness(1);
+      }
+      50% {
+        opacity: 0.98;
+        filter: brightness(1.06);
+      }
     }
   </style>
 </head>
@@ -103,12 +135,101 @@
     <div class="signature">— Y &amp; Z</div>
   </div>
 
+  <div class="hint">click gently</div>
+
   <script type="module">
     import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 
     const container = document.getElementById("app");
     const quoteEl = document.getElementById("quote");
 
+    // -----------------------------
+    // 音乐
+    // -----------------------------
+    const bgm = new Audio("./assets/audio/bgm.mp3");
+    bgm.loop = true;
+    bgm.volume = 0;
+
+    let musicStarted = false;
+    let bgmTargetVolume = 0.28;
+    let bgmCurrentVolume = 0;
+
+    function fadeAudioTo(target, speed = 0.01) {
+      bgmTargetVolume = target;
+      function step() {
+        if (Math.abs(bgmCurrentVolume - bgmTargetVolume) < 0.005) {
+          bgmCurrentVolume = bgmTargetVolume;
+          bgm.volume = Math.max(0, Math.min(1, bgmCurrentVolume));
+          return;
+        }
+        bgmCurrentVolume += (bgmTargetVolume - bgmCurrentVolume) * speed * 3.2;
+        bgm.volume = Math.max(0, Math.min(1, bgmCurrentVolume));
+        requestAnimationFrame(step);
+      }
+      step();
+    }
+
+    async function startMusic() {
+      if (musicStarted) return;
+      try {
+        await bgm.play();
+        musicStarted = true;
+        fadeAudioTo(0.28, 0.02);
+      } catch (err) {
+        console.warn("Music could not start automatically after interaction.", err);
+      }
+    }
+
+    function musicPulse() {
+      if (!musicStarted) return;
+      fadeAudioTo(0.34, 0.03);
+      setTimeout(() => fadeAudioTo(0.28, 0.015), 900);
+    }
+
+    // -----------------------------
+    // 图片预加载（自动尝试 01~10）
+    // -----------------------------
+    const photoPaths = Array.from({ length: 10 }, (_, i) => {
+      const n = String(i + 1).padStart(2, "0");
+      return `./assets/photos/${n}.jpg`;
+    });
+
+    const loadedPhotos = [];
+    let currentPhotoIndex = -1;
+    let photoPulse = 0;
+    let photoHold = 0;
+    let firstRevealDone = false;
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    Promise.allSettled(photoPaths.map(loadImage)).then(results => {
+      results.forEach(result => {
+        if (result.status === "fulfilled") {
+          loadedPhotos.push(result.value);
+        }
+      });
+      console.log(`Loaded ${loadedPhotos.length} photos.`);
+    });
+
+    function showNextPhoto() {
+      if (loadedPhotos.length === 0) return;
+      currentPhotoIndex = (currentPhotoIndex + 1) % loadedPhotos.length;
+      photoPulse = 1.0;
+      photoHold = firstRevealDone ? 2.6 : 3.4;
+      firstRevealDone = true;
+    }
+
+    // -----------------------------
+    // Three.js 基础
+    // -----------------------------
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x020611, 0.00145);
 
@@ -138,10 +259,11 @@
 
     const clock = new THREE.Clock();
     let pulse = 0;
+    let slowSkyShift = 0;
 
-    // --------------------------------------------------
-    // 星空基础层
-    // --------------------------------------------------
+    // -----------------------------
+    // 工具函数
+    // -----------------------------
     function setColor(arr, i, r, g, b) {
       arr[i * 3] = r;
       arr[i * 3 + 1] = g;
@@ -168,6 +290,9 @@
       return pts;
     }
 
+    // -----------------------------
+    // 星空
+    // -----------------------------
     const STAR_COUNT = 7800;
     const starGeometry = new THREE.BufferGeometry();
 
@@ -177,6 +302,7 @@
     const phases = new Float32Array(STAR_COUNT);
     const brightness = new Float32Array(STAR_COUNT);
     const softness = new Float32Array(STAR_COUNT);
+    const special = new Float32Array(STAR_COUNT);
 
     for (let i = 0; i < STAR_COUNT; i++) {
       const radius = 180 + Math.random() * 820;
@@ -218,13 +344,14 @@
       }
 
       phases[i] = Math.random() * Math.PI * 2;
+      special[i] = 0.0;
     }
 
-    // 暗藏 initials：Y 和 Z
+    // 隐藏 Y / Z
     const hiddenY = makeLetterPoints("Y", 6.3, -132, -68);
     const hiddenZ = makeLetterPoints("Z", 6.3, 126, 58);
-
     const specialPoints = [...hiddenY, ...hiddenZ];
+
     specialPoints.forEach((p, idx) => {
       if (idx >= STAR_COUNT) return;
       const i = idx;
@@ -243,6 +370,7 @@
       brightness[i] = 1.25 + Math.random() * 0.45;
       softness[i] = 1.3 + Math.random() * 0.25;
       phases[i] = Math.random() * Math.PI * 2;
+      special[i] = 1.0;
     });
 
     starGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -251,6 +379,7 @@
     starGeometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
     starGeometry.setAttribute("aBrightness", new THREE.BufferAttribute(brightness, 1));
     starGeometry.setAttribute("aSoftness", new THREE.BufferAttribute(softness, 1));
+    starGeometry.setAttribute("aSpecial", new THREE.BufferAttribute(special, 1));
 
     const starMaterial = new THREE.ShaderMaterial({
       transparent: true,
@@ -259,13 +388,15 @@
       vertexColors: true,
       uniforms: {
         uTime: { value: 0 },
-        uPulse: { value: 0 }
+        uPulse: { value: 0 },
+        uMouse: { value: new THREE.Vector2(0, 0) }
       },
       vertexShader: `
         attribute float aSize;
         attribute float aPhase;
         attribute float aBrightness;
         attribute float aSoftness;
+        attribute float aSpecial;
 
         varying vec3 vColor;
         varying float vAlpha;
@@ -274,6 +405,7 @@
 
         uniform float uTime;
         uniform float uPulse;
+        uniform vec2 uMouse;
 
         void main() {
           vColor = color;
@@ -288,16 +420,22 @@
 
           float pulseGlow = uPulse * clamp((260.0 - abs(p.z)) / 260.0, 0.0, 1.0) * 0.35;
 
-          vAlpha = (0.30 + twinkle * 0.62 + pulseGlow) * clamp(aBrightness, 0.35, 1.95);
+          float hoverDist = distance(position.xy * 0.006, uMouse);
+          float hoverGlow = smoothstep(0.18, 0.0, hoverDist) * 0.12;
+
+          float specialGlow = aSpecial * smoothstep(0.16, 0.0, hoverDist) * 0.22;
+
+          vAlpha = (0.30 + twinkle * 0.62 + pulseGlow + hoverGlow + specialGlow) * clamp(aBrightness, 0.35, 1.95);
 
           vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mvPosition;
 
           float depthBoost = clamp((980.0 - abs(p.z)) / 980.0, 0.62, 1.22);
           float pulseScale = 1.0 + uPulse * clamp((220.0 - abs(p.z)) / 220.0, 0.0, 1.0) * 0.42;
+          float hoverScale = 1.0 + hoverGlow * 1.2 + specialGlow * 1.4;
 
           float size = aSize * depthBoost * (255.0 / -mvPosition.z);
-          gl_PointSize = max(size * pulseScale, 0.8);
+          gl_PointSize = max(size * pulseScale * hoverScale, 0.8);
         }
       `,
       fragmentShader: `
@@ -340,9 +478,9 @@
     const stars = new THREE.Points(starGeometry, starMaterial);
     scene.add(stars);
 
-    // --------------------------------------------------
-    // 近景微尘层
-    // --------------------------------------------------
+    // -----------------------------
+    // 近景微尘
+    // -----------------------------
     const dustCount = 260;
     const dustGeometry = new THREE.BufferGeometry();
     const dustPos = new Float32Array(dustCount * 3);
@@ -396,9 +534,9 @@
     const dust = new THREE.Points(dustGeometry, dustMaterial);
     scene.add(dust);
 
-    // --------------------------------------------------
+    // -----------------------------
     // 星云 mist
-    // --------------------------------------------------
+    // -----------------------------
     const mistGroup = new THREE.Group();
     scene.add(mistGroup);
 
@@ -449,10 +587,10 @@
       ], 240, 28, 58, -220, 1.0, 0.54)
     ];
 
-    // --------------------------------------------------
-    // 月亮
-    // --------------------------------------------------
-    function createMoonTexture() {
+    // -----------------------------
+    // 月亮贴图
+    // -----------------------------
+    function createMoonTexture(photoImage = null, photoAlpha = 0) {
       const canvas = document.createElement("canvas");
       canvas.width = 1024;
       canvas.height = 1024;
@@ -464,10 +602,10 @@
       const cy = h / 2;
       const r = 302;
 
-      // 外层冷色 halo
+      // halo
       const halo = ctx.createRadialGradient(cx, cy, r * 0.76, cx, cy, r * 1.65);
-      halo.addColorStop(0, "rgba(220,230,255,0.20)");
-      halo.addColorStop(0.28, "rgba(175,200,255,0.09)");
+      halo.addColorStop(0, `rgba(220,230,255,${0.20 + photoAlpha * 0.06})`);
+      halo.addColorStop(0.28, `rgba(175,200,255,${0.09 + photoAlpha * 0.04})`);
       halo.addColorStop(0.58, "rgba(135,165,255,0.04)");
       halo.addColorStop(1, "rgba(100,130,220,0)");
       ctx.fillStyle = halo;
@@ -478,7 +616,6 @@
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.clip();
 
-      // 主体基底
       const base = ctx.createRadialGradient(cx - r * 0.28, cy - r * 0.32, r * 0.12, cx, cy, r);
       base.addColorStop(0, "#f1f3f7");
       base.addColorStop(0.38, "#dde2ea");
@@ -487,7 +624,6 @@
       ctx.fillStyle = base;
       ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-      // 受光方向
       const light = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
       light.addColorStop(0.00, "rgba(255,255,255,0.22)");
       light.addColorStop(0.35, "rgba(255,255,255,0.06)");
@@ -496,7 +632,50 @@
       ctx.fillStyle = light;
       ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-      // 月海斑块
+      // 照片融入月亮
+      if (photoImage && photoAlpha > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = 0.14 + photoAlpha * 0.22;
+
+        const imgRatio = photoImage.width / photoImage.height;
+        const boxSize = r * 1.72;
+        let drawW, drawH;
+        if (imgRatio >= 1) {
+          drawH = boxSize;
+          drawW = drawH * imgRatio;
+        } else {
+          drawW = boxSize;
+          drawH = drawW / imgRatio;
+        }
+
+        const dx = cx - drawW / 2;
+        const dy = cy - drawH / 2;
+
+        ctx.filter = "blur(1px) saturate(0.8) brightness(0.96)";
+        ctx.drawImage(photoImage, dx, dy, drawW, drawH);
+
+        const fade = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r * 0.96);
+        fade.addColorStop(0, "rgba(255,255,255,1)");
+        fade.addColorStop(0.72, "rgba(255,255,255,0.75)");
+        fade.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.globalCompositeOperation = "destination-in";
+        ctx.fillStyle = fade;
+        ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+        ctx.restore();
+
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = 0.06 + photoAlpha * 0.08;
+        const photoGlow = ctx.createRadialGradient(cx, cy, r * 0.12, cx, cy, r * 0.95);
+        photoGlow.addColorStop(0, "rgba(255,255,255,0.9)");
+        photoGlow.addColorStop(0.75, "rgba(210,220,255,0.16)");
+        photoGlow.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = photoGlow;
+        ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+      }
+
       function mare(x, y, rx, ry, alpha) {
         ctx.beginPath();
         ctx.ellipse(x, y, rx, ry, Math.random() * Math.PI, 0, Math.PI * 2);
@@ -545,7 +724,6 @@
         crater(x, y, 4 + Math.random() * 13, 0.045 + Math.random() * 0.08);
       }
 
-      // 细颗粒
       const img = ctx.getImageData(0, 0, w, h);
       const data = img.data;
       for (let y = 0; y < h; y++) {
@@ -564,7 +742,6 @@
       }
       ctx.putImageData(img, 0, 0);
 
-      // 边缘暗角
       const vignette = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r);
       vignette.addColorStop(0, "rgba(0,0,0,0)");
       vignette.addColorStop(0.78, "rgba(0,0,0,0.015)");
@@ -579,9 +756,9 @@
       return texture;
     }
 
-    const moonTexture = createMoonTexture();
+    let currentMoonTexture = createMoonTexture();
     const moonMaterial = new THREE.SpriteMaterial({
-      map: moonTexture,
+      map: currentMoonTexture,
       transparent: true,
       depthWrite: false,
       opacity: 0.96
@@ -592,7 +769,6 @@
     moon.scale.set(84, 84, 1);
     scene.add(moon);
 
-    // 月亮附近极淡薄雾
     const moonMist = createMistSprite([
       [0.00, "rgba(190,210,255,0.10)"],
       [0.24, "rgba(135,170,255,0.05)"],
@@ -600,9 +776,17 @@
     ], 165, 148, 78, -176, 1.0, 1.0);
     moonMist.material.opacity = 0.35;
 
-    // --------------------------------------------------
+    function updateMoonTexture(photoImg = null, alpha = 0) {
+      const newTex = createMoonTexture(photoImg, alpha);
+      const oldTex = moonMaterial.map;
+      moonMaterial.map = newTex;
+      moonMaterial.needsUpdate = true;
+      if (oldTex) oldTex.dispose();
+    }
+
+    // -----------------------------
     // click 光波
-    // --------------------------------------------------
+    // -----------------------------
     const ringGeometry = new THREE.RingGeometry(8.2, 8.9, 96);
     const ringMaterial = new THREE.MeshBasicMaterial({
       color: 0xd6e5ff,
@@ -616,7 +800,7 @@
     ring.position.z = 18;
     scene.add(ring);
 
-    // 柔和短尾
+    // 短尾
     const streakGroup = new THREE.Group();
     scene.add(streakGroup);
 
@@ -636,6 +820,31 @@
       streakGroup.add(line);
       streaks.push(line);
     }
+
+    // 流星
+    const shootingStars = [];
+    function spawnShootingStar() {
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(-16, 5, 0)
+      ]);
+      const mat = new THREE.LineBasicMaterial({
+        color: 0xf2f6ff,
+        transparent: true,
+        opacity: 0.0
+      });
+      const line = new THREE.Line(geo, mat);
+      line.position.set(180 + Math.random() * 120, 60 + Math.random() * 60, -90);
+      line.rotation.z = -0.45 + Math.random() * 0.12;
+      line.userData.life = 1;
+      line.userData.vx = -2.2 - Math.random() * 2.0;
+      line.userData.vy = -0.65 - Math.random() * 0.6;
+      line.userData.fade = 0.035 + Math.random() * 0.015;
+      scene.add(line);
+      shootingStars.push(line);
+    }
+
+    let nextShootingStarAt = 8 + Math.random() * 8;
 
     function triggerPulse() {
       pulse = 1.0;
@@ -665,9 +874,9 @@
       );
     }
 
-    // --------------------------------------------------
+    // -----------------------------
     // 交互
-    // --------------------------------------------------
+    // -----------------------------
     window.addEventListener("mousemove", (e) => {
       mouse.tx = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.ty = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -678,8 +887,11 @@
       mouse.ty = 0;
     });
 
-    window.addEventListener("click", () => {
+    window.addEventListener("click", async () => {
+      await startMusic();
+      musicPulse();
       triggerPulse();
+      showNextPhoto();
     });
 
     function onResize() {
@@ -690,9 +902,9 @@
     }
     window.addEventListener("resize", onResize);
 
-    // --------------------------------------------------
+    // -----------------------------
     // 动画
-    // --------------------------------------------------
+    // -----------------------------
     function animate() {
       requestAnimationFrame(animate);
 
@@ -700,6 +912,8 @@
 
       mouse.x += (mouse.tx - mouse.x) * 0.042;
       mouse.y += (mouse.ty - mouse.y) * 0.042;
+
+      slowSkyShift = (Math.sin(elapsed * 0.04) + 1) * 0.5;
 
       camera.position.x = mouse.x * 12;
       camera.position.y = mouse.y * 7;
@@ -715,6 +929,7 @@
 
       starMaterial.uniforms.uTime.value = elapsed;
       starMaterial.uniforms.uPulse.value = pulse;
+      starMaterial.uniforms.uMouse.value.set(mouse.x, mouse.y);
       dustMaterial.uniforms.uTime.value = elapsed;
 
       if (pulse > 0.001) {
@@ -731,12 +946,14 @@
       mistSprites[2].position.x = 28 + mouse.x * 3.5;
       mistSprites[2].position.y = 58 + mouse.y * 2.5;
 
+      const moonBreath = 0.5 + 0.5 * Math.sin(elapsed * 0.16);
       moon.position.x = 152 + mouse.x * 2.1;
       moon.position.y = 82 + mouse.y * 1.3;
+      moon.scale.setScalar(84 + moonBreath * 0.45);
 
       moonMist.position.x = 148 + mouse.x * 2.6;
       moonMist.position.y = 78 + mouse.y * 1.5;
-      moonMist.material.opacity = 0.28 + Math.sin(elapsed * 0.22) * 0.02;
+      moonMist.material.opacity = 0.27 + Math.sin(elapsed * 0.22) * 0.02 + pulse * 0.03;
 
       ring.position.x = mouse.x * 18;
       ring.position.y = mouse.y * 10;
@@ -752,6 +969,62 @@
           line.material.opacity = 0;
         }
       });
+
+      // 照片融入月亮
+      let photoAlpha = 0;
+      let activePhoto = null;
+      if (loadedPhotos.length > 0 && currentPhotoIndex >= 0) {
+        activePhoto = loadedPhotos[currentPhotoIndex];
+
+        if (photoPulse > 0.001) {
+          photoPulse *= 0.955;
+          photoAlpha = Math.min(1, 1 - photoPulse);
+        }
+
+        if (photoHold > 0) {
+          photoHold -= 1 / 60;
+          photoAlpha = 1;
+        } else if (photoPulse <= 0.001 && photoAlpha === 0) {
+          // nothing
+        }
+
+        // 淡出阶段
+        if (photoHold <= 0 && photoPulse <= 0.4 && photoPulse > 0) {
+          photoAlpha = Math.max(0, photoPulse * 2.4);
+        }
+
+        photoAlpha = Math.min(photoAlpha, 1);
+      }
+
+      const moonPhotoAlpha = activePhoto ? photoAlpha * 0.92 : 0;
+      updateMoonTexture(activePhoto, moonPhotoAlpha);
+
+      moonMaterial.opacity = 0.94 + pulse * 0.035 + moonPhotoAlpha * 0.05;
+
+      // 流星
+      if (elapsed > nextShootingStarAt) {
+        spawnShootingStar();
+        nextShootingStarAt = elapsed + 10 + Math.random() * 12;
+      }
+
+      for (let i = shootingStars.length - 1; i >= 0; i--) {
+        const s = shootingStars[i];
+        s.position.x += s.userData.vx;
+        s.position.y += s.userData.vy;
+        s.material.opacity = Math.min(0.45, s.material.opacity + 0.03);
+        s.userData.life -= s.userData.fade;
+
+        if (s.userData.life < 0.45) {
+          s.material.opacity *= 0.92;
+        }
+
+        if (s.material.opacity < 0.01 || s.position.x < -280 || s.position.y < -140) {
+          scene.remove(s);
+          s.geometry.dispose();
+          s.material.dispose();
+          shootingStars.splice(i, 1);
+        }
+      }
 
       renderer.render(scene, camera);
     }
