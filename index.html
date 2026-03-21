@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>3D Starfield Demo</title>
+  <title>Quiet Night</title>
   <style>
     * {
       margin: 0;
@@ -15,15 +15,15 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
+      font-family: "Helvetica Neue", Arial, sans-serif;
       background:
-        radial-gradient(circle at 50% 40%, #0a1f5c 0%, #040b22 35%, #01030a 100%);
-      font-family: Arial, sans-serif;
+        radial-gradient(circle at 50% 42%, #09173f 0%, #040c23 36%, #01040c 100%);
     }
 
     #app {
+      position: relative;
       width: 100%;
       height: 100%;
-      position: relative;
     }
 
     canvas {
@@ -35,70 +35,88 @@
       inset: 0;
       pointer-events: none;
       background:
-        radial-gradient(circle at 78% 18%, rgba(180, 205, 255, 0.10), transparent 14%),
-        radial-gradient(circle at 20% 70%, rgba(90, 120, 255, 0.06), transparent 25%),
-        radial-gradient(circle at 55% 45%, rgba(120, 80, 255, 0.05), transparent 22%);
+        radial-gradient(circle at 76% 20%, rgba(170, 200, 255, 0.05), transparent 16%),
+        radial-gradient(circle at 22% 72%, rgba(90, 110, 210, 0.045), transparent 26%),
+        radial-gradient(circle at 58% 48%, rgba(110, 90, 180, 0.03), transparent 24%);
       mix-blend-mode: screen;
     }
 
-    .hud {
+    .quote-wrap {
       position: fixed;
-      left: 24px;
-      bottom: 20px;
-      color: rgba(255,255,255,0.72);
-      font-size: 14px;
-      letter-spacing: 0.5px;
-      user-select: none;
+      left: 5.5vw;
+      bottom: 8vh;
+      z-index: 10;
       pointer-events: none;
-      text-shadow: 0 0 12px rgba(255,255,255,0.12);
-      line-height: 1.7;
+      user-select: none;
+      max-width: min(580px, 72vw);
     }
 
-    .title {
-      position: fixed;
-      top: 24px;
-      left: 24px;
-      color: rgba(255,255,255,0.9);
-      font-size: 20px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      user-select: none;
-      pointer-events: none;
-      text-shadow: 0 0 16px rgba(255,255,255,0.10);
+    .quote {
+      color: rgba(255, 255, 255, 0.86);
+      font-size: clamp(20px, 2vw, 28px);
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      line-height: 1.45;
+      text-shadow:
+        0 0 20px rgba(255,255,255,0.06),
+        0 0 50px rgba(180,210,255,0.05);
+      opacity: 0;
+      transform: translateY(10px);
+      animation: quoteFade 2.8s ease forwards;
     }
 
-    .subtitle {
+    .signature {
+      margin-top: 12px;
+      color: rgba(210, 220, 255, 0.42);
+      font-size: 12px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      text-shadow: 0 0 16px rgba(200,220,255,0.05);
+      opacity: 0;
+      transform: translateY(10px);
+      animation: quoteFade 3.3s ease forwards;
+    }
+
+    @keyframes quoteFade {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .vignette {
       position: fixed;
-      top: 54px;
-      left: 24px;
-      color: rgba(200,215,255,0.62);
-      font-size: 13px;
-      letter-spacing: 0.8px;
-      user-select: none;
+      inset: 0;
       pointer-events: none;
+      background:
+        radial-gradient(circle at center, transparent 48%, rgba(0,0,0,0.12) 82%, rgba(0,0,0,0.22) 100%);
     }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <div class="overlay"></div>
-  <div class="title">3D Starfield Demo</div>
-  <div class="subtitle">Interactive depth visualization with parallax and warp effect</div>
-  <div class="hud">Move mouse • Click for warp pulse</div>
+  <div class="vignette"></div>
+
+  <div class="quote-wrap">
+    <div class="quote" id="quote">Every star feels quieter with you</div>
+    <div class="signature">— Y &amp; Z</div>
+  </div>
 
   <script type="module">
     import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 
     const container = document.getElementById("app");
+    const quoteEl = document.getElementById("quote");
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x020611, 0.0017);
+    scene.fog = new THREE.FogExp2(0x020611, 0.00145);
 
     const camera = new THREE.PerspectiveCamera(
-      70,
+      68,
       window.innerWidth / window.innerHeight,
       0.1,
-      2000
+      2200
     );
     camera.position.z = 120;
 
@@ -108,62 +126,131 @@
     });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
 
     const mouse = {
-      x: 0,
-      y: 0,
-      tx: 0,
-      ty: 0
+      x: 0, y: 0,
+      tx: 0, ty: 0
     };
 
-    let warpPulse = 0;
     const clock = new THREE.Clock();
+    let pulse = 0;
 
-    // ---------- Star field ----------
-    const STAR_COUNT = 9000;
+    // --------------------------------------------------
+    // 星空基础层
+    // --------------------------------------------------
+    function setColor(arr, i, r, g, b) {
+      arr[i * 3] = r;
+      arr[i * 3 + 1] = g;
+      arr[i * 3 + 2] = b;
+    }
+
+    function makeLetterPoints(letter, scale = 7.5, offsetX = 0, offsetY = 0) {
+      const pts = [];
+      if (letter === "Y") {
+        const raw = [
+          [-2.5, 3], [-1.8, 2.2], [-1.0, 1.4], [-0.2, 0.6],
+          [ 2.5, 3], [ 1.8, 2.2], [ 1.0, 1.4], [ 0.2, 0.6],
+          [ 0.0, 0.4], [0.0, -0.5], [0.0, -1.4], [0.0, -2.4], [0.0, -3.3]
+        ];
+        raw.forEach(([x, y]) => pts.push({ x: x * scale + offsetX, y: y * scale + offsetY }));
+      } else if (letter === "Z") {
+        const raw = [
+          [-2.8, 3], [-1.6, 3], [-0.4, 3], [0.8, 3], [2.0, 3],
+          [ 1.4, 1.9], [0.8, 0.8], [0.1, -0.2], [-0.7, -1.3], [-1.5, -2.3],
+          [-2.7, -3], [-1.5, -3], [-0.3, -3], [0.9, -3], [2.1, -3]
+        ];
+        raw.forEach(([x, y]) => pts.push({ x: x * scale + offsetX, y: y * scale + offsetY }));
+      }
+      return pts;
+    }
+
+    const STAR_COUNT = 7800;
     const starGeometry = new THREE.BufferGeometry();
 
     const positions = new Float32Array(STAR_COUNT * 3);
     const colors = new Float32Array(STAR_COUNT * 3);
     const sizes = new Float32Array(STAR_COUNT);
-
-    function setStarColor(i, r, g, b) {
-      colors[i * 3] = r;
-      colors[i * 3 + 1] = g;
-      colors[i * 3 + 2] = b;
-    }
+    const phases = new Float32Array(STAR_COUNT);
+    const brightness = new Float32Array(STAR_COUNT);
+    const softness = new Float32Array(STAR_COUNT);
 
     for (let i = 0; i < STAR_COUNT; i++) {
-      const radius = 200 + Math.random() * 700;
+      const radius = 180 + Math.random() * 820;
       const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos((Math.random() * 2) - 1);
+      const phi = Math.acos(Math.random() * 2 - 1);
 
       const x = radius * Math.sin(phi) * Math.cos(theta);
-      const y = radius * Math.sin(phi) * Math.sin(theta) * 0.65;
-      const z = (Math.random() - 0.5) * 1600;
+      const y = radius * Math.sin(phi) * Math.sin(theta) * 0.63;
+      const z = (Math.random() - 0.5) * 1800;
 
       positions[i * 3] = x;
       positions[i * 3 + 1] = y;
       positions[i * 3 + 2] = z;
 
       const c = Math.random();
-      if (c < 0.72) {
-        setStarColor(i, 1.0, 1.0, 1.0);
-      } else if (c < 0.88) {
-        setStarColor(i, 0.82, 0.88, 1.0);
-      } else if (c < 0.96) {
-        setStarColor(i, 0.68, 0.78, 1.0);
+      if (c < 0.60) {
+        setColor(colors, i, 1.0, 0.985, 0.955);
+      } else if (c < 0.82) {
+        setColor(colors, i, 0.84, 0.90, 1.0);
+      } else if (c < 0.93) {
+        setColor(colors, i, 0.70, 0.82, 1.0);
       } else {
-        setStarColor(i, 1.0, 0.90, 0.82);
+        setColor(colors, i, 1.0, 0.88, 0.75);
       }
 
-      sizes[i] = Math.random() * 2.2 + 0.6;
+      const t = Math.random();
+      if (t < 0.76) {
+        sizes[i] = Math.random() * 0.95 + 0.28;
+        brightness[i] = 0.38 + Math.random() * 0.28;
+        softness[i] = 0.85 + Math.random() * 0.35;
+      } else if (t < 0.95) {
+        sizes[i] = Math.random() * 1.65 + 0.95;
+        brightness[i] = 0.68 + Math.random() * 0.38;
+        softness[i] = 1.0 + Math.random() * 0.4;
+      } else {
+        sizes[i] = Math.random() * 2.8 + 2.1;
+        brightness[i] = 1.08 + Math.random() * 0.7;
+        softness[i] = 1.18 + Math.random() * 0.55;
+      }
+
+      phases[i] = Math.random() * Math.PI * 2;
     }
+
+    // 暗藏 initials：Y 和 Z
+    const hiddenY = makeLetterPoints("Y", 6.3, -132, -68);
+    const hiddenZ = makeLetterPoints("Z", 6.3, 126, 58);
+
+    const specialPoints = [...hiddenY, ...hiddenZ];
+    specialPoints.forEach((p, idx) => {
+      if (idx >= STAR_COUNT) return;
+      const i = idx;
+
+      positions[i * 3] = p.x + (Math.random() - 0.5) * 2.8;
+      positions[i * 3 + 1] = p.y + (Math.random() - 0.5) * 2.8;
+      positions[i * 3 + 2] = -180 + Math.random() * 50;
+
+      if (idx < hiddenY.length) {
+        setColor(colors, i, 0.98, 0.95, 0.90);
+      } else {
+        setColor(colors, i, 0.88, 0.92, 1.0);
+      }
+
+      sizes[i] = 2.25 + Math.random() * 0.9;
+      brightness[i] = 1.25 + Math.random() * 0.45;
+      softness[i] = 1.3 + Math.random() * 0.25;
+      phases[i] = Math.random() * Math.PI * 2;
+    });
 
     starGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     starGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     starGeometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+    starGeometry.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
+    starGeometry.setAttribute("aBrightness", new THREE.BufferAttribute(brightness, 1));
+    starGeometry.setAttribute("aSoftness", new THREE.BufferAttribute(softness, 1));
 
     const starMaterial = new THREE.ShaderMaterial({
       transparent: true,
@@ -171,49 +258,80 @@
       blending: THREE.AdditiveBlending,
       vertexColors: true,
       uniforms: {
-        uTime: { value: 0.0 },
-        uWarp: { value: 0.0 }
+        uTime: { value: 0 },
+        uPulse: { value: 0 }
       },
       vertexShader: `
         attribute float aSize;
+        attribute float aPhase;
+        attribute float aBrightness;
+        attribute float aSoftness;
+
         varying vec3 vColor;
         varying float vAlpha;
+        varying float vBrightness;
+        varying float vSoftness;
 
         uniform float uTime;
-        uniform float uWarp;
+        uniform float uPulse;
 
         void main() {
           vColor = color;
+          vBrightness = aBrightness;
+          vSoftness = aSoftness;
 
           vec3 p = position;
 
-          float twinkle = sin(uTime * 1.5 + position.x * 0.01 + position.z * 0.008) * 0.5 + 0.5;
-          vAlpha = 0.45 + twinkle * 0.55;
+          float twinkleA = sin(uTime * (1.05 + aBrightness * 0.32) + aPhase + position.x * 0.009);
+          float twinkleB = sin(uTime * 1.85 + aPhase * 1.7 + position.y * 0.008);
+          float twinkle = 0.56 + twinkleA * 0.22 + twinkleB * 0.12;
 
-          float warpStretch = 1.0 + uWarp * clamp((200.0 - abs(p.z)) / 200.0, 0.0, 1.0) * 0.7;
+          float pulseGlow = uPulse * clamp((260.0 - abs(p.z)) / 260.0, 0.0, 1.0) * 0.35;
+
+          vAlpha = (0.30 + twinkle * 0.62 + pulseGlow) * clamp(aBrightness, 0.35, 1.95);
 
           vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mvPosition;
 
-          float size = aSize * (260.0 / -mvPosition.z);
-          gl_PointSize = size * warpStretch;
+          float depthBoost = clamp((980.0 - abs(p.z)) / 980.0, 0.62, 1.22);
+          float pulseScale = 1.0 + uPulse * clamp((220.0 - abs(p.z)) / 220.0, 0.0, 1.0) * 0.42;
+
+          float size = aSize * depthBoost * (255.0 / -mvPosition.z);
+          gl_PointSize = max(size * pulseScale, 0.8);
         }
       `,
       fragmentShader: `
         varying vec3 vColor;
         varying float vAlpha;
+        varying float vBrightness;
+        varying float vSoftness;
 
         void main() {
           vec2 uv = gl_PointCoord - vec2(0.5);
           float d = length(uv);
 
-          float glow = smoothstep(0.5, 0.0, d);
-          float core = smoothstep(0.18, 0.0, d);
+          float core = smoothstep(0.11 * vSoftness, 0.0, d);
+          float body = smoothstep(0.28 * vSoftness, 0.0, d);
+          float halo = smoothstep(0.53 * vSoftness, 0.08, d);
 
-          vec3 col = vColor * glow + vec3(1.0) * core * 0.35;
-          float alpha = glow * vAlpha;
+          float spikeX = smoothstep(0.02, 0.0, abs(uv.x)) * smoothstep(0.34, 0.0, abs(uv.y));
+          float spikeY = smoothstep(0.02, 0.0, abs(uv.y)) * smoothstep(0.34, 0.0, abs(uv.x));
+          float spike = max(spikeX, spikeY);
+          float spikeAmount = smoothstep(1.12, 1.75, vBrightness) * 0.22;
 
-          if (alpha < 0.02) discard;
+          vec3 col =
+            vColor * body * 0.92 +
+            vColor * halo * 0.72 +
+            vec3(1.0) * core * 0.72 +
+            vec3(1.0, 0.985, 0.96) * spike * spikeAmount;
+
+          float alpha =
+            halo * 0.38 * vAlpha +
+            body * 0.62 * vAlpha +
+            core * 0.9 * vAlpha +
+            spike * spikeAmount * vAlpha;
+
+          if (alpha < 0.018) discard;
           gl_FragColor = vec4(col, alpha);
         }
       `
@@ -222,87 +340,272 @@
     const stars = new THREE.Points(starGeometry, starMaterial);
     scene.add(stars);
 
-    // ---------- Galaxy mist ----------
+    // --------------------------------------------------
+    // 近景微尘层
+    // --------------------------------------------------
+    const dustCount = 260;
+    const dustGeometry = new THREE.BufferGeometry();
+    const dustPos = new Float32Array(dustCount * 3);
+    const dustSize = new Float32Array(dustCount);
+
+    for (let i = 0; i < dustCount; i++) {
+      dustPos[i * 3] = (Math.random() - 0.5) * 520;
+      dustPos[i * 3 + 1] = (Math.random() - 0.5) * 280;
+      dustPos[i * 3 + 2] = -30 + Math.random() * 120;
+      dustSize[i] = Math.random() * 1.5 + 0.6;
+    }
+
+    dustGeometry.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
+    dustGeometry.setAttribute("aSize", new THREE.BufferAttribute(dustSize, 1));
+
+    const dustMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uTime: { value: 0.0 }
+      },
+      vertexShader: `
+        attribute float aSize;
+        uniform float uTime;
+        varying float vAlpha;
+
+        void main() {
+          vec3 p = position;
+          p.y += sin(uTime * 0.18 + p.x * 0.02) * 1.5;
+          p.x += cos(uTime * 0.12 + p.y * 0.016) * 1.0;
+
+          vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+          gl_PointSize = aSize * (100.0 / -mvPosition.z);
+          vAlpha = 0.12 + 0.08 * sin(uTime + position.x * 0.03);
+        }
+      `,
+      fragmentShader: `
+        varying float vAlpha;
+        void main() {
+          vec2 uv = gl_PointCoord - vec2(0.5);
+          float d = length(uv);
+          float a = smoothstep(0.5, 0.0, d) * vAlpha;
+          if (a < 0.01) discard;
+          gl_FragColor = vec4(0.82, 0.88, 1.0, a);
+        }
+      `
+    });
+
+    const dust = new THREE.Points(dustGeometry, dustMaterial);
+    scene.add(dust);
+
+    // --------------------------------------------------
+    // 星云 mist
+    // --------------------------------------------------
     const mistGroup = new THREE.Group();
     scene.add(mistGroup);
 
-    function createMistSprite(color, opacity, scale, x, y, z) {
+    function createMistSprite(colorStops, scale, x, y, z, sx = 1, sy = 0.6) {
       const canvas = document.createElement("canvas");
-      canvas.width = 256;
-      canvas.height = 256;
+      canvas.width = 512;
+      canvas.height = 512;
       const ctx = canvas.getContext("2d");
 
-      const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-      grad.addColorStop(0, color.replace("ALPHA", String(opacity)));
-      grad.addColorStop(0.35, color.replace("ALPHA", String(opacity * 0.5)));
-      grad.addColorStop(1, color.replace("ALPHA", "0"));
-
+      const grad = ctx.createRadialGradient(256, 256, 10, 256, 256, 256);
+      colorStops.forEach(([stop, color]) => grad.addColorStop(stop, color));
       ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 256, 256);
+      ctx.fillRect(0, 0, 512, 512);
 
       const texture = new THREE.CanvasTexture(canvas);
       const material = new THREE.SpriteMaterial({
         map: texture,
         transparent: true,
         depthWrite: false,
-        blending: THREE.AdditiveBlending
+        blending: THREE.AdditiveBlending,
+        opacity: 0.52
       });
 
       const sprite = new THREE.Sprite(material);
       sprite.position.set(x, y, z);
-      sprite.scale.set(scale, scale * 0.6, 1);
+      sprite.scale.set(scale * sx, scale * sy, 1);
       mistGroup.add(sprite);
       return sprite;
     }
 
     const mistSprites = [
-      createMistSprite("rgba(90,120,255,ALPHA)", 0.24, 320, -80, 20, -220),
-      createMistSprite("rgba(140,100,255,ALPHA)", 0.18, 280, 120, -10, -300),
-      createMistSprite("rgba(80,150,255,ALPHA)", 0.16, 240, 30, 55, -180)
+      createMistSprite([
+        [0.00, "rgba(135,160,255,0.12)"],
+        [0.28, "rgba(100,125,230,0.09)"],
+        [1.00, "rgba(90,110,200,0.0)"]
+      ], 330, -95, 18, -260, 1.0, 0.56),
+
+      createMistSprite([
+        [0.00, "rgba(175,155,255,0.08)"],
+        [0.35, "rgba(125,105,205,0.06)"],
+        [1.00, "rgba(70,65,120,0.0)"]
+      ], 290, 118, -12, -320, 1.0, 0.58),
+
+      createMistSprite([
+        [0.00, "rgba(150,185,255,0.08)"],
+        [0.34, "rgba(90,135,240,0.06)"],
+        [1.00, "rgba(70,120,200,0.0)"]
+      ], 240, 28, 58, -220, 1.0, 0.54)
     ];
 
-    // ---------- Moon ----------
+    // --------------------------------------------------
+    // 月亮
+    // --------------------------------------------------
     function createMoonTexture() {
       const canvas = document.createElement("canvas");
-      canvas.width = 512;
-      canvas.height = 512;
+      canvas.width = 1024;
+      canvas.height = 1024;
       const ctx = canvas.getContext("2d");
 
-      const glow = ctx.createRadialGradient(256, 256, 20, 256, 256, 240);
-      glow.addColorStop(0, "rgba(255,255,255,1)");
-      glow.addColorStop(0.35, "rgba(230,235,245,1)");
-      glow.addColorStop(0.7, "rgba(210,215,230,0.95)");
-      glow.addColorStop(1, "rgba(180,190,220,0)");
+      const w = canvas.width;
+      const h = canvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const r = 302;
 
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, 512, 512);
+      // 外层冷色 halo
+      const halo = ctx.createRadialGradient(cx, cy, r * 0.76, cx, cy, r * 1.65);
+      halo.addColorStop(0, "rgba(220,230,255,0.20)");
+      halo.addColorStop(0.28, "rgba(175,200,255,0.09)");
+      halo.addColorStop(0.58, "rgba(135,165,255,0.04)");
+      halo.addColorStop(1, "rgba(100,130,220,0)");
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, w, h);
 
-      ctx.globalAlpha = 0.12;
-      ctx.fillStyle = "#8e95aa";
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(200, 220, 28, 0, Math.PI * 2);
-      ctx.arc(315, 280, 20, 0, Math.PI * 2);
-      ctx.arc(270, 165, 14, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.clip();
 
-      return new THREE.CanvasTexture(canvas);
+      // 主体基底
+      const base = ctx.createRadialGradient(cx - r * 0.28, cy - r * 0.32, r * 0.12, cx, cy, r);
+      base.addColorStop(0, "#f1f3f7");
+      base.addColorStop(0.38, "#dde2ea");
+      base.addColorStop(0.72, "#c6cedb");
+      base.addColorStop(1, "#8f99ac");
+      ctx.fillStyle = base;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+      // 受光方向
+      const light = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+      light.addColorStop(0.00, "rgba(255,255,255,0.22)");
+      light.addColorStop(0.35, "rgba(255,255,255,0.06)");
+      light.addColorStop(0.70, "rgba(60,68,88,0.08)");
+      light.addColorStop(1.00, "rgba(25,32,48,0.22)");
+      ctx.fillStyle = light;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+      // 月海斑块
+      function mare(x, y, rx, ry, alpha) {
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(110,118,135,${alpha})`;
+        ctx.fill();
+      }
+
+      mare(cx - 82, cy - 55, 78, 56, 0.11);
+      mare(cx + 70, cy + 28, 58, 40, 0.09);
+      mare(cx + 24, cy - 124, 34, 24, 0.08);
+      mare(cx - 18, cy + 102, 44, 30, 0.06);
+
+      function crater(x, y, rad, depth = 0.16) {
+        const g = ctx.createRadialGradient(
+          x - rad * 0.24, y - rad * 0.24, rad * 0.12,
+          x, y, rad
+        );
+        g.addColorStop(0, `rgba(255,255,255,${depth * 0.48})`);
+        g.addColorStop(0.26, `rgba(180,186,200,${depth * 0.42})`);
+        g.addColorStop(0.72, `rgba(86,91,110,${depth * 0.82})`);
+        g.addColorStop(1, "rgba(36,42,58,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, rad, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(255,255,255,${depth * 0.26})`;
+        ctx.lineWidth = Math.max(1, rad * 0.04);
+        ctx.beginPath();
+        ctx.arc(x - rad * 0.06, y - rad * 0.06, rad * 0.82, Math.PI * 1.1, Math.PI * 1.74);
+        ctx.stroke();
+      }
+
+      crater(cx - 96, cy - 62, 62, 0.22);
+      crater(cx + 82, cy + 32, 44, 0.18);
+      crater(cx + 26, cy - 116, 27, 0.16);
+      crater(cx - 12, cy + 94, 36, 0.13);
+      crater(cx - 150, cy + 72, 24, 0.11);
+      crater(cx + 136, cy - 88, 20, 0.10);
+
+      for (let i = 0; i < 95; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const rr = Math.sqrt(Math.random()) * r * 0.87;
+        const x = cx + Math.cos(ang) * rr;
+        const y = cy + Math.sin(ang) * rr;
+        crater(x, y, 4 + Math.random() * 13, 0.045 + Math.random() * 0.08);
+      }
+
+      // 细颗粒
+      const img = ctx.getImageData(0, 0, w, h);
+      const data = img.data;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const dx = x - cx;
+          const dy = y - cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist <= r) {
+            const idx = (y * w + x) * 4;
+            const n = (Math.random() - 0.5) * 11;
+            data[idx] += n;
+            data[idx + 1] += n;
+            data[idx + 2] += n * 1.06;
+          }
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+
+      // 边缘暗角
+      const vignette = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r);
+      vignette.addColorStop(0, "rgba(0,0,0,0)");
+      vignette.addColorStop(0.78, "rgba(0,0,0,0.015)");
+      vignette.addColorStop(1, "rgba(26,30,46,0.18)");
+      ctx.fillStyle = vignette;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+
+      ctx.restore();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      return texture;
     }
 
     const moonTexture = createMoonTexture();
     const moonMaterial = new THREE.SpriteMaterial({
       map: moonTexture,
       transparent: true,
-      depthWrite: false
+      depthWrite: false,
+      opacity: 0.96
     });
+
     const moon = new THREE.Sprite(moonMaterial);
-    moon.position.set(150, 82, -140);
-    moon.scale.set(95, 95, 1);
+    moon.position.set(152, 82, -170);
+    moon.scale.set(84, 84, 1);
     scene.add(moon);
 
-    // ---------- Warp ring ----------
-    const ringGeometry = new THREE.RingGeometry(8, 8.8, 64);
+    // 月亮附近极淡薄雾
+    const moonMist = createMistSprite([
+      [0.00, "rgba(190,210,255,0.10)"],
+      [0.24, "rgba(135,170,255,0.05)"],
+      [1.00, "rgba(120,150,255,0.0)"]
+    ], 165, 148, 78, -176, 1.0, 1.0);
+    moonMist.material.opacity = 0.35;
+
+    // --------------------------------------------------
+    // click 光波
+    // --------------------------------------------------
+    const ringGeometry = new THREE.RingGeometry(8.2, 8.9, 96);
     const ringMaterial = new THREE.MeshBasicMaterial({
-      color: 0xbfd8ff,
+      color: 0xd6e5ff,
       transparent: true,
       opacity: 0,
       side: THREE.DoubleSide,
@@ -310,22 +613,21 @@
       depthWrite: false
     });
     const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-    ring.position.z = 20;
+    ring.position.z = 18;
     scene.add(ring);
 
-    // ---------- Star streaks ----------
-    const streakCount = 22;
+    // 柔和短尾
     const streakGroup = new THREE.Group();
     scene.add(streakGroup);
 
     const streaks = [];
-    for (let i = 0; i < streakCount; i++) {
+    for (let i = 0; i < 16; i++) {
       const geo = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, -18, 0)
+        new THREE.Vector3(0, -12, 0)
       ]);
       const mat = new THREE.LineBasicMaterial({
-        color: 0xdde8ff,
+        color: 0xe6eeff,
         transparent: true,
         opacity: 0
       });
@@ -335,21 +637,37 @@
       streaks.push(line);
     }
 
-    function triggerWarpStreaks() {
+    function triggerPulse() {
+      pulse = 1.0;
+
       streaks.forEach((line, i) => {
-        const x = (Math.random() - 0.5) * 220;
-        const y = (Math.random() - 0.5) * 140;
-        const z = Math.random() * 100 - 50;
+        const x = (Math.random() - 0.5) * 180;
+        const y = (Math.random() - 0.5) * 110;
+        const z = Math.random() * 70 - 35;
 
         line.position.set(x, y, z);
-        line.rotation.z = (Math.random() - 0.5) * 0.25;
-        line.scale.set(1, 1 + Math.random() * 4, 1);
-        line.material.opacity = 0.7 - i * 0.015;
+        line.rotation.z = (Math.random() - 0.5) * 0.16;
+        line.scale.set(1, 0.8 + Math.random() * 2.0, 1);
+        line.material.opacity = 0.36 - i * 0.012;
         line.visible = true;
       });
+
+      quoteEl.animate(
+        [
+          { opacity: 1, filter: "brightness(1)" },
+          { opacity: 1, filter: "brightness(1.18)" },
+          { opacity: 1, filter: "brightness(1)" }
+        ],
+        {
+          duration: 1800,
+          easing: "ease-out"
+        }
+      );
     }
 
-    // ---------- Interaction ----------
+    // --------------------------------------------------
+    // 交互
+    // --------------------------------------------------
     window.addEventListener("mousemove", (e) => {
       mouse.tx = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.ty = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -361,11 +679,9 @@
     });
 
     window.addEventListener("click", () => {
-      warpPulse = 1.0;
-      triggerWarpStreaks();
+      triggerPulse();
     });
 
-    // ---------- Resize ----------
     function onResize() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -374,54 +690,64 @@
     }
     window.addEventListener("resize", onResize);
 
-    // ---------- Animation ----------
+    // --------------------------------------------------
+    // 动画
+    // --------------------------------------------------
     function animate() {
       requestAnimationFrame(animate);
 
       const elapsed = clock.getElapsedTime();
 
-      mouse.x += (mouse.tx - mouse.x) * 0.045;
-      mouse.y += (mouse.ty - mouse.y) * 0.045;
+      mouse.x += (mouse.tx - mouse.x) * 0.042;
+      mouse.y += (mouse.ty - mouse.y) * 0.042;
 
-      camera.position.x = mouse.x * 18;
-      camera.position.y = mouse.y * 10;
-      camera.lookAt(0, 0, -220);
+      camera.position.x = mouse.x * 12;
+      camera.position.y = mouse.y * 7;
+      camera.lookAt(0, 0, -240);
 
-      stars.rotation.y += 0.00035;
-      stars.rotation.x += 0.00008;
-      stars.position.x = mouse.x * 10;
-      stars.position.y = mouse.y * 6;
+      stars.rotation.y += 0.00018;
+      stars.rotation.x += 0.00004;
+      stars.position.x = mouse.x * 5.8;
+      stars.position.y = mouse.y * 3.4;
+
+      dust.position.x = mouse.x * 16;
+      dust.position.y = mouse.y * 10;
 
       starMaterial.uniforms.uTime.value = elapsed;
+      starMaterial.uniforms.uPulse.value = pulse;
+      dustMaterial.uniforms.uTime.value = elapsed;
 
-      if (warpPulse > 0.001) {
-        warpPulse *= 0.93;
+      if (pulse > 0.001) {
+        pulse *= 0.935;
       } else {
-        warpPulse = 0;
+        pulse = 0;
       }
-      starMaterial.uniforms.uWarp.value = warpPulse;
 
-      mistGroup.rotation.z += 0.0004;
-      mistSprites[0].position.x = -80 + mouse.x * 8;
-      mistSprites[0].position.y = 20 + mouse.y * 5;
-      mistSprites[1].position.x = 120 + mouse.x * 12;
-      mistSprites[1].position.y = -10 + mouse.y * 6;
-      mistSprites[2].position.x = 30 + mouse.x * 7;
-      mistSprites[2].position.y = 55 + mouse.y * 4;
+      mistGroup.rotation.z += 0.00012;
+      mistSprites[0].position.x = -95 + mouse.x * 4;
+      mistSprites[0].position.y = 18 + mouse.y * 3;
+      mistSprites[1].position.x = 118 + mouse.x * 6;
+      mistSprites[1].position.y = -12 + mouse.y * 3.5;
+      mistSprites[2].position.x = 28 + mouse.x * 3.5;
+      mistSprites[2].position.y = 58 + mouse.y * 2.5;
 
-      moon.position.x = 150 + mouse.x * 6;
-      moon.position.y = 82 + mouse.y * 4;
+      moon.position.x = 152 + mouse.x * 2.1;
+      moon.position.y = 82 + mouse.y * 1.3;
 
-      ring.position.x = mouse.x * 28;
-      ring.position.y = mouse.y * 16;
-      ring.scale.setScalar(1 + (1 - warpPulse) * 18);
-      ring.material.opacity = warpPulse * 0.35;
+      moonMist.position.x = 148 + mouse.x * 2.6;
+      moonMist.position.y = 78 + mouse.y * 1.5;
+      moonMist.material.opacity = 0.28 + Math.sin(elapsed * 0.22) * 0.02;
+
+      ring.position.x = mouse.x * 18;
+      ring.position.y = mouse.y * 10;
+      ring.scale.setScalar(1 + (1 - pulse) * 14);
+      ring.material.opacity = pulse * 0.22;
 
       streaks.forEach((line) => {
         if (!line.visible) return;
-        line.position.z += 7 + warpPulse * 16;
-        line.material.opacity *= 0.93;
-        if (line.material.opacity < 0.03) {
+        line.position.z += 2.6 + pulse * 4.2;
+        line.material.opacity *= 0.94;
+        if (line.material.opacity < 0.018) {
           line.visible = false;
           line.material.opacity = 0;
         }
