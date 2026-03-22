@@ -1,28 +1,141 @@
-<div id="app"></div>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Starlit Archive</title>
 
-<button id="navGallery"></button>
-<button id="navAbout"></button>
-<button id="navMusic"></button>
+  <link rel="stylesheet" href="./css/base.css" />
+  <link rel="stylesheet" href="./css/layout.css" />
+  <link rel="stylesheet" href="./css/components.css" />
+  <link rel="stylesheet" href="./css/modal.css" />
+</head>
+<body>
+  <div id="app"></div>
 
-<button id="heroGalleryBtn"></button>
-<button id="heroAboutBtn"></button>
+  <div class="overlay"></div>
+  <div class="vignette"></div>
+  <div class="grain"></div>
 
-<div id="quote"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-chip">starlit archive</div>
+      <div class="brand-sub">moon · memory · motion</div>
+    </div>
 
-<div id="galleryModal"></div>
-<button id="closeGallery"></button>
-<div id="albumList"></div>
-<div id="galleryGrid"></div>
-<div id="galleryHeading"></div>
-<div id="gallerySub"></div>
-<div id="galleryMeta"></div>
+    <nav class="nav">
+      <button id="navGallery" type="button">Gallery</button>
+      <button id="navAbout" type="button">About</button>
+      <button id="navMusic" type="button">Music On</button>
+    </nav>
+  </header>
 
-<div id="aboutModal"></div>
-<button id="closeAbout"></button>
+  <section class="hero-info">
+    <div class="eyebrow">personal night scene</div>
+    <h1 class="hero-title">A sky you can<br />step into</h1>
+    <p class="hero-desc">
+      漂浮的星塵、月光、音樂與相片一起構成一個可以停留的頁面。
+      點擊夜空會喚醒漣漪與流星，也可以從右上角打開相冊，安靜地看每一張照片。
+    </p>
 
-<div id="lightbox"></div>
-<img id="lightboxImg" />
-<div id="lightboxCaption"></div>
-<button id="closeLightbox"></button>
-<button id="prevLightbox"></button>
-<button id="nextLightbox"></button>
+    <div class="hero-actions">
+      <button class="panel-button" id="heroGalleryBtn" type="button">Open Gallery</button>
+      <button class="panel-button ghost" id="heroAboutBtn" type="button">Read the Scene</button>
+    </div>
+  </section>
+
+  <section class="quote-wrap">
+    <div class="quote" id="quote">Every star feels quieter with you</div>
+    <div class="signature">— Y &amp; Z</div>
+  </section>
+
+  <div class="status-pill">click to wake the sky</div>
+  <div class="hint">move slowly · click gently</div>
+
+  <!-- Gallery Modal -->
+  <div class="modal" id="galleryModal" aria-hidden="true">
+    <div class="modal-card gallery-card">
+      <aside class="gallery-sidebar">
+        <div class="album-title">Albums</div>
+        <div class="album-list" id="albumList"></div>
+      </aside>
+
+      <section class="gallery-main">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <h2 id="galleryHeading">Gallery</h2>
+            <div class="modal-sub" id="gallerySub">Selected album</div>
+          </div>
+          <button class="close-btn" id="closeGallery" type="button" aria-label="Close gallery">×</button>
+        </div>
+
+        <div class="gallery-toolbar">
+          <div class="gallery-meta" id="galleryMeta">0 photos</div>
+        </div>
+
+        <div class="gallery-grid" id="galleryGrid"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- About Modal -->
+  <div class="modal" id="aboutModal" aria-hidden="true">
+    <div class="modal-card about-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h2>About This Page</h2>
+          <div class="modal-sub">immersive landing scene</div>
+        </div>
+        <button class="close-btn" id="closeAbout" type="button" aria-label="Close about">×</button>
+      </div>
+
+      <div class="about-content">
+        <p>
+          這個版本不是單純把圖片放上去，而是把首頁、氛圍動畫與可瀏覽相冊結合在一起。
+          你仍然保留了夜空與月亮的氣質，但現在它更像一個真正可使用的個人頁面。
+        </p>
+        <p>
+          點擊頁面時，夜空會被短暫喚醒：漣漪擴散、流星劃過、月亮映入照片，再慢慢退回原本的月光。
+          相冊則可以從右上角直接打開，安靜地查看每一張縮略圖與大圖。
+        </p>
+
+        <div class="about-grid">
+          <div class="about-item">
+            <h3>Visual</h3>
+            <div>多層星空、薄霧、塵埃、月亮光暈與動態流星。</div>
+          </div>
+          <div class="about-item">
+            <h3>Gallery</h3>
+            <div>多相冊、縮略圖網格、大圖查看與後續擴展能力。</div>
+          </div>
+          <div class="about-item">
+            <h3>Interaction</h3>
+            <div>點擊後觸發漣漪、音樂脈衝、月亮照片顯示與淡出。</div>
+          </div>
+          <div class="about-item">
+            <h3>Scalable</h3>
+            <div>已模組化拆分，後續可繼續加 About / Research / Contact。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <div class="lightbox-inner">
+      <div class="lightbox-bar">
+        <div class="lightbox-caption" id="lightboxCaption">Photo</div>
+        <div class="lightbox-controls">
+          <button class="lightbox-btn" id="prevLightbox" type="button" aria-label="Previous">‹</button>
+          <button class="lightbox-btn" id="nextLightbox" type="button" aria-label="Next">›</button>
+          <button class="lightbox-btn" id="closeLightbox" type="button" aria-label="Close">×</button>
+        </div>
+      </div>
+      <img id="lightboxImg" alt="Selected photo" />
+    </div>
+  </div>
+
+  <script type="module" src="/starfield-animation/js/main.js"></script>
+</body>
+</html>
