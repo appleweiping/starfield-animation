@@ -1,88 +1,89 @@
-import { state } from "../core/state.js";
-import { fileNameFromPath } from "./galleryData.js";
+import { appState } from "../core/state.js";
+import { getPhotoName } from "./galleryData.js";
 
-let els = null;
+export function createLightbox({ onPhotoChange } = {}) {
+  const root = document.getElementById("lightbox");
+  const image = document.getElementById("lightboxImg");
+  const caption = document.getElementById("lightboxCaption");
+  const closeBtn = document.getElementById("closeLightbox");
+  const prevBtn = document.getElementById("prevLightbox");
+  const nextBtn = document.getElementById("nextLightbox");
 
-function renderLightbox() {
-  if (!els) return;
-  if (!state.lightbox.isOpen) return;
+  if (!root || !image || !caption || !closeBtn || !prevBtn || !nextBtn) {
+    throw new Error("Lightbox DOM elements are missing");
+  }
 
-  const { albumFiles, currentIndex } = state.lightbox;
-  const src = albumFiles[currentIndex];
-
-  if (!src) return;
-
-  els.img.src = src;
-  els.img.alt = fileNameFromPath(src);
-  els.caption.textContent = `${currentIndex + 1} / ${albumFiles.length} · ${fileNameFromPath(src)}`;
-}
-
-export function initLightbox(options) {
-  els = {
-    root: options.root,
-    img: options.img,
-    caption: options.caption,
-    closeBtn: options.closeBtn,
-    prevBtn: options.prevBtn,
-    nextBtn: options.nextBtn
+  const state = {
+    files: [],
+    index: 0
   };
 
-  els.closeBtn.addEventListener("click", closeLightbox);
-  els.prevBtn.addEventListener("click", showPrevLightboxImage);
-  els.nextBtn.addEventListener("click", showNextLightboxImage);
+  function update() {
+    if (!state.files.length) return;
 
-  els.root.addEventListener("click", (e) => {
-    if (e.target === els.root) {
-      closeLightbox();
+    const src = state.files[state.index];
+    image.src = src;
+    image.alt = getPhotoName(src);
+    caption.textContent = getPhotoName(src);
+
+    if (typeof onPhotoChange === "function") {
+      onPhotoChange(src);
     }
-  });
+  }
 
-  window.addEventListener("keydown", (e) => {
-    if (!state.lightbox.isOpen) return;
+  function open(files, index = 0) {
+    state.files = files.slice();
+    state.index = Math.max(0, Math.min(index, state.files.length - 1));
 
-    if (e.key === "Escape") closeLightbox();
-    if (e.key === "ArrowLeft") showPrevLightboxImage();
-    if (e.key === "ArrowRight") showNextLightboxImage();
-  });
-}
+    update();
 
-export function openLightbox(files, startIndex = 0) {
-  if (!Array.isArray(files) || files.length === 0 || !els) return;
+    root.classList.add("open");
+    root.setAttribute("aria-hidden", "false");
+    appState.lightboxOpen = true;
+  }
 
-  state.lightbox.albumFiles = files.slice();
-  state.lightbox.currentIndex = Math.max(0, Math.min(startIndex, files.length - 1));
-  state.lightbox.isOpen = true;
+  function close() {
+    root.classList.remove("open");
+    root.setAttribute("aria-hidden", "true");
+    appState.lightboxOpen = false;
+  }
 
-  els.root.classList.add("open");
-  els.root.setAttribute("aria-hidden", "false");
+  function step(direction) {
+    if (!state.files.length) return;
+    state.index = (state.index + direction + state.files.length) % state.files.length;
+    update();
+  }
 
-  renderLightbox();
-}
+  function bindEvents() {
+    closeBtn.addEventListener("click", close);
+    prevBtn.addEventListener("click", () => step(-1));
+    nextBtn.addEventListener("click", () => step(1));
 
-export function closeLightbox() {
-  if (!els) return;
+    root.addEventListener("click", (event) => {
+      if (event.target === root) {
+        close();
+      }
+    });
 
-  state.lightbox.isOpen = false;
-  els.root.classList.remove("open");
-  els.root.setAttribute("aria-hidden", "true");
-}
+    window.addEventListener("keydown", (event) => {
+      if (!appState.lightboxOpen) return;
 
-export function showPrevLightboxImage() {
-  const files = state.lightbox.albumFiles;
-  if (!files.length) return;
+      if (event.key === "Escape") {
+        close();
+      } else if (event.key === "ArrowLeft") {
+        step(-1);
+      } else if (event.key === "ArrowRight") {
+        step(1);
+      }
+    });
+  }
 
-  state.lightbox.currentIndex =
-    (state.lightbox.currentIndex - 1 + files.length) % files.length;
+  bindEvents();
 
-  renderLightbox();
-}
-
-export function showNextLightboxImage() {
-  const files = state.lightbox.albumFiles;
-  if (!files.length) return;
-
-  state.lightbox.currentIndex =
-    (state.lightbox.currentIndex + 1) % files.length;
-
-  renderLightbox();
+  return {
+    open,
+    close,
+    step,
+    isOpen: () => appState.lightboxOpen
+  };
 }

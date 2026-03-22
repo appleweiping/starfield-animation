@@ -1,116 +1,138 @@
-import { state } from "../core/state.js";
+import { appState } from "../core/state.js";
 import {
   getAlbums,
-  getAlbumById,
   getCurrentAlbum,
-  setCurrentAlbum,
-  fileNameFromPath
+  selectAlbum,
+  selectPhoto,
+  getPhotoName
 } from "./galleryData.js";
-import { openLightbox } from "./lightbox.js";
 
-let els = null;
-let onPhotoSelect = null;
+export function createGalleryUI({ lightbox, onPhotoSelect } = {}) {
+  const modal = document.getElementById("galleryModal");
+  const closeBtn = document.getElementById("closeGallery");
+  const albumListEl = document.getElementById("albumList");
+  const galleryGrid = document.getElementById("galleryGrid");
+  const galleryHeading = document.getElementById("galleryHeading");
+  const gallerySub = document.getElementById("gallerySub");
+  const galleryMeta = document.getElementById("galleryMeta");
 
-function updateAlbumHeader(album) {
-  els.heading.textContent = album?.name || "Gallery";
-  els.sub.textContent = album?.desc || "";
-  const count = album?.files?.length || 0;
-  els.meta.textContent = `${count} photo${count > 1 ? "s" : ""}`;
-}
-
-function renderAlbumList() {
-  const albums = getAlbums();
-  els.albumList.innerHTML = "";
-
-  albums.forEach(album => {
-    const btn = document.createElement("button");
-    btn.className = "album-btn";
-    btn.dataset.id = album.id;
-    btn.innerHTML = `
-      <strong>${album.name}</strong>
-      <span>${album.files.length} photos · ${album.desc}</span>
-    `;
-
-    btn.classList.toggle("active", album.id === state.gallery.currentAlbumId);
-
-    btn.addEventListener("click", () => {
-      setActiveAlbum(album.id);
-    });
-
-    els.albumList.appendChild(btn);
-  });
-}
-
-function renderGalleryGrid(album) {
-  els.grid.innerHTML = "";
-
-  if (!album || !album.files.length) {
-    els.grid.innerHTML = `<div class="gallery-empty">No photos yet.</div>`;
-    return;
+  if (
+    !modal ||
+    !closeBtn ||
+    !albumListEl ||
+    !galleryGrid ||
+    !galleryHeading ||
+    !gallerySub ||
+    !galleryMeta
+  ) {
+    throw new Error("Gallery DOM elements are missing");
   }
 
-  album.files.forEach((src, index) => {
-    const item = document.createElement("button");
-    item.className = "thumb";
-    item.type = "button";
-    item.innerHTML = `
-      <img src="${src}" alt="${fileNameFromPath(src)}" loading="lazy" />
-      <div class="thumb-label">${fileNameFromPath(src)}</div>
-    `;
+  function open() {
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    appState.galleryOpen = true;
+  }
 
-    item.addEventListener("click", () => {
-      if (typeof onPhotoSelect === "function") {
-        onPhotoSelect(src, { album, index });
+  function close() {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+    appState.galleryOpen = false;
+  }
+
+  function renderAlbumList() {
+    const albums = getAlbums();
+    albumListEl.innerHTML = "";
+
+    albums.forEach((album) => {
+      const button = document.createElement("button");
+      button.className = "album-btn";
+      button.dataset.id = album.id;
+      button.innerHTML = `
+        <strong>${album.name}</strong>
+        <span>${album.files.length} photos · ${album.desc || ""}</span>
+      `;
+
+      button.addEventListener("click", () => {
+        selectAlbum(album.id);
+        render();
+      });
+
+      albumListEl.appendChild(button);
+    });
+  }
+
+  function renderCurrentAlbumInfo() {
+    const album = getCurrentAlbum();
+    if (!album) return;
+
+    galleryHeading.textContent = album.name;
+    gallerySub.textContent = album.desc || "";
+    galleryMeta.textContent = `${album.files.length} photo${album.files.length > 1 ? "s" : ""}`;
+
+    [...albumListEl.querySelectorAll(".album-btn")].forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.id === album.id);
+    });
+  }
+
+  function renderCurrentAlbumGrid() {
+    const album = getCurrentAlbum();
+    if (!album) return;
+
+    galleryGrid.innerHTML = "";
+
+    album.files.forEach((src, index) => {
+      const card = document.createElement("div");
+      card.className = "thumb";
+      card.innerHTML = `
+        <img src="${src}" alt="${getPhotoName(src)}" loading="lazy" />
+        <div class="thumb-label">${getPhotoName(src)}</div>
+      `;
+
+      card.addEventListener("click", () => {
+        selectPhoto(src);
+
+        if (typeof onPhotoSelect === "function") {
+          onPhotoSelect(src);
+        }
+
+        if (lightbox) {
+          lightbox.open(album.files, index);
+        }
+      });
+
+      galleryGrid.appendChild(card);
+    });
+  }
+
+  function render() {
+    renderAlbumList();
+    renderCurrentAlbumInfo();
+    renderCurrentAlbumGrid();
+  }
+
+  function bindEvents() {
+    closeBtn.addEventListener("click", close);
+
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) {
+        close();
       }
-      openLightbox(album.files, index);
     });
 
-    els.grid.appendChild(item);
-  });
-}
+    window.addEventListener("keydown", (event) => {
+      if (!appState.galleryOpen) return;
+      if (event.key === "Escape") close();
+    });
+  }
 
-export function setActiveAlbum(id) {
-  const album = setCurrentAlbum(id);
-  if (!album) return;
+  render();
+  bindEvents();
 
-  updateAlbumHeader(album);
-  renderAlbumList();
-  renderGalleryGrid(album);
-}
-
-export function initGalleryUI(options) {
-  els = {
-    modal: options.modal,
-    albumList: options.albumList,
-    grid: options.grid,
-    heading: options.heading,
-    sub: options.sub,
-    meta: options.meta,
-    closeBtn: options.closeBtn
+  return {
+    open,
+    close,
+    render,
+    isOpen: () => appState.galleryOpen
   };
-
-  onPhotoSelect = options.onPhotoSelect || null;
-
-  els.closeBtn.addEventListener("click", closeGalleryModal);
-
-  els.modal.addEventListener("click", (e) => {
-    if (e.target === els.modal) {
-      closeGalleryModal();
-    }
-  });
-
-  const currentAlbum = getCurrentAlbum() || getAlbumById(state.gallery.currentAlbumId);
-  updateAlbumHeader(currentAlbum);
-  renderAlbumList();
-  renderGalleryGrid(currentAlbum);
-}
-
-export function openGallery() {
-  els.modal.classList.add("open");
-  els.modal.setAttribute("aria-hidden", "false");
-}
-
-export function closeGalleryModal() {
-  els.modal.classList.remove("open");
-  els.modal.setAttribute("aria-hidden", "true");
 }
