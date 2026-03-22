@@ -30,13 +30,12 @@ export function startAnimationLoop(app) {
   function animate() {
     requestAnimationFrame(animate);
 
-    const elapsed = clock.getElapsedTime();
     const delta = Math.min(clock.getDelta(), 0.033);
+    const elapsed = clock.elapsedTime;
 
     appState.mouse.x = lerp(appState.mouse.x, appState.mouse.tx, 0.04);
     appState.mouse.y = lerp(appState.mouse.y, appState.mouse.ty, 0.04);
 
-    // camera 轻微视差
     camera.position.x = lerp(camera.position.x, appState.mouse.x * 7.5, 0.035);
     camera.position.y = lerp(camera.position.y, appState.mouse.y * 4.2, 0.035);
     camera.lookAt(0, 0, 0);
