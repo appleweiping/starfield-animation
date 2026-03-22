@@ -55,3 +55,5 @@ export const SCENE_CONFIG = {
     halo2Scale: 170
   }
 };
+
+export default SCENE_CONFIG;
