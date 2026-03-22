@@ -1,37 +1,43 @@
-import { loadGalleryData } from "./gallery/galleryData.js";
-import { initGalleryUI, openGallery } from "./gallery/galleryUI.js";
-import { initLightbox } from "./gallery/lightbox.js";
+import { createApp } from "./core/app.js";
 
 async function bootstrap() {
-  await loadGalleryData();
+  try {
+    const app = await createApp();
 
-  initLightbox({
-    root: document.getElementById("lightbox"),
-    img: document.getElementById("lightboxImg"),
-    caption: document.getElementById("lightboxCaption"),
-    closeBtn: document.getElementById("closeLightbox"),
-    prevBtn: document.getElementById("prevLightbox"),
-    nextBtn: document.getElementById("nextLightbox")
-  });
+    console.log("App initialized successfully");
+    console.log("Albums:", app.albums);
+    console.log("Loaded photos:", app.loadedPhotos);
 
-  initGalleryUI({
-    modal: document.getElementById("galleryModal"),
-    albumList: document.getElementById("albumList"),
-    grid: document.getElementById("galleryGrid"),
-    heading: document.getElementById("galleryHeading"),
-    sub: document.getElementById("gallerySub"),
-    meta: document.getElementById("galleryMeta"),
-    closeBtn: document.getElementById("closeGallery"),
-    onPhotoSelect: (src) => {
-      console.log("selected photo:", src);
-      // 第三批这里再接 revealSpecificPhoto(src)
+    window.addEventListener("resize", app.resize);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      app.renderer.render(app.scene, app.camera);
     }
-  });
 
-  document.getElementById("navGallery")?.addEventListener("click", openGallery);
-  document.getElementById("heroGalleryBtn")?.addEventListener("click", openGallery);
+    animate();
+  } catch (error) {
+    console.error("Failed to bootstrap app:", error);
+
+    const fallback = document.createElement("div");
+    fallback.style.position = "fixed";
+    fallback.style.inset = "0";
+    fallback.style.display = "grid";
+    fallback.style.placeItems = "center";
+    fallback.style.background = "#02040e";
+    fallback.style.color = "white";
+    fallback.style.fontFamily = "sans-serif";
+    fallback.style.padding = "24px";
+    fallback.style.textAlign = "center";
+    fallback.innerHTML = `
+      <div>
+        <h2 style="margin-bottom: 12px;">App failed to start</h2>
+        <div style="opacity: 0.75;">Check the browser console for details.</div>
+      </div>
+    `;
+
+    document.body.appendChild(fallback);
+  }
 }
 
-bootstrap().catch(err => {
-  console.error("bootstrap failed:", err);
-});
+bootstrap();
