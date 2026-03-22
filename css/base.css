@@ -1,0 +1,137 @@
+:root {
+  --bg: #040814;
+  --panel: rgba(10, 16, 32, 0.48);
+  --panel-strong: rgba(10, 16, 32, 0.72);
+  --line: rgba(175, 205, 255, 0.14);
+  --line-strong: rgba(195, 220, 255, 0.25);
+  --text: rgba(241, 246, 255, 0.92);
+  --text-soft: rgba(216, 226, 255, 0.72);
+  --text-faint: rgba(216, 226, 255, 0.44);
+  --blur: 18px;
+  --shadow: 0 18px 80px rgba(0, 0, 0, 0.34);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(76, 108, 184, 0.16), transparent 28%),
+    radial-gradient(circle at 80% 15%, rgba(137, 161, 255, 0.09), transparent 24%),
+    radial-gradient(circle at 50% 100%, rgba(64, 92, 166, 0.10), transparent 40%),
+    linear-gradient(180deg, #050917 0%, #030713 45%, #02040e 100%);
+  color: var(--text);
+  font-family: Inter, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.12) 78%, rgba(0, 0, 0, 0.28) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 255, 255, 0.03), transparent 22%),
+    radial-gradient(circle at 50% 30%, rgba(144, 180, 255, 0.06), transparent 30%),
+    linear-gradient(180deg, rgba(8, 13, 28, 0.06), rgba(5, 8, 18, 0.24));
+  mix-blend-mode: screen;
+}
+
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, transparent 52%, rgba(0, 0, 0, 0.18) 78%, rgba(0, 0, 0, 0.34) 100%);
+}
+
+.grain {
+  position: fixed;
+  inset: -50%;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.2) 0.7px, transparent 0.9px);
+  background-size: 8px 8px;
+  animation: grainMove 12s linear infinite;
+  mix-blend-mode: soft-light;
+}
+
+@keyframes grainMove {
+  from {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(3%, 2%);
+  }
+
+  to {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes fadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes quoteBreath {
+  0%,
+  100% {
+    opacity: 0.86;
+    filter: brightness(1);
+  }
+
+  50% {
+    opacity: 0.98;
+    filter: brightness(1.05);
+  }
+}

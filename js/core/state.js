@@ -1,43 +1,50 @@
-export const state = {
-  appReady: false,
+export const appState = {
+  albums: [],
+  loadedPhotos: new Map(),
 
-  music: {
-    started: false,
-    enabled: true,
-    currentVolume: 0,
-    targetVolume: 0,
-    rafId: null
-  },
+  currentAlbumId: null,
+  currentPhotoIndex: -1,
+  currentPhotoSrc: null,
 
-  gallery: {
-    albums: [],
-    currentAlbumId: null
-  },
+  galleryOpen: false,
+  aboutOpen: false,
+  lightboxOpen: false,
 
-  lightbox: {
-    isOpen: false,
-    albumFiles: [],
-    currentIndex: 0
-  },
-
-  moonPhoto: {
-    currentSrc: null,
-    blend: 0,
-    targetBlend: 0,
-    holdTimer: 0,
-    pulse: 0
-  },
-
-  scene: {
-    pulse: 0,
-    nextPhotoIndex: -1,
-    nextAmbientShootingStarAt: 0
-  },
+  musicStarted: false,
+  musicEnabled: true,
 
   pointer: {
+    x: 0,
+    y: 0
+  },
+
+  mouse: {
     x: 0,
     y: 0,
     tx: 0,
     ty: 0
   }
 };
+
+export function setAlbums(albums) {
+  appState.albums = albums;
+  if (!appState.currentAlbumId && albums.length > 0) {
+    appState.currentAlbumId = albums[0].id;
+  }
+}
+
+export function setCurrentAlbum(id) {
+  appState.currentAlbumId = id;
+}
+
+export function setCurrentPhoto(src) {
+  appState.currentPhotoSrc = src;
+}
+
+export function setMusicStarted(value) {
+  appState.musicStarted = value;
+}
+
+export function setMusicEnabled(value) {
+  appState.musicEnabled = value;
+}

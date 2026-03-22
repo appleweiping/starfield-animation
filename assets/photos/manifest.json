@@ -3,8 +3,7 @@
     {
       "id": "daily",
       "name": "Daily",
-      "desc": "日常片段",
-      "cover": "./assets/photos/daily/01.jpg",
+      "desc": "Quiet ordinary moments",
       "files": [
         "./assets/photos/daily/01.jpg",
         "./assets/photos/daily/02.jpg"
@@ -13,8 +12,7 @@
     {
       "id": "campus",
       "name": "Campus",
-      "desc": "校园时刻",
-      "cover": "./assets/photos/campus/01.jpg",
+      "desc": "University fragments",
       "files": [
         "./assets/photos/campus/01.jpg",
         "./assets/photos/campus/02.jpg"
@@ -23,8 +21,7 @@
     {
       "id": "night",
       "name": "Night",
-      "desc": "夜色与月光",
-      "cover": "./assets/photos/night/01.jpg",
+      "desc": "Moonlight and evening scenes",
       "files": [
         "./assets/photos/night/01.jpg",
         "./assets/photos/night/02.jpg"
